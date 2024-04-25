@@ -428,6 +428,8 @@ Inode-based allocation can use the i-node structure to find the target directly.
 
 5. A file system using linked-list disk allocation (also termed chained allocation) provides poor random access performance.
 
+https://edstem.org/au/courses/14865/discussion/1922900
+
 True
 
 Link-list based allocation requires the FS to read all blocks prior to the target block in order to locate the target block.
@@ -491,8 +493,242 @@ FAT 1
 Inode 1
 
 ## Quiz 5 FileManagement? (wk7)
+1. Why does Linux pre-allocate up to 8 blocks on a write to a file?
+
+Pre-allocating provides better future read locality when many writes to independent files are interleaved.
+
+2. Linux uses a buffer cache to improve performance. What is the drawback of such a cache? In what scenario is it problematic? What alternative would be more appropriate where a buffer cache is inappropriate?
+
+The buffering writes in the buffer cache provides the opportunity for data to be lost if the system stops prior to the cache being flushed.
+
+Removable storage devices are particular problematic if users don't "unmount" them first.
+
+Robustness can be improved by using a write-through cache at the expense of poor write performance.
+
+3. What is the structure of the contents of a directory? Does it contain attributes such as creation times of files? If not, where might this information be stored?
+
+See lecture slides.
+No, directories only have a name-to-inode mapping
+Attributes of the file are stored in the inode itself.
+
+4. The Unix inode structure contains a reference count. What is the reference count for? Why can't we just remove the inode without checking the reference count when a file is deleted?
+
+Inodes contain a reference count due to hard links. The reference count is equal to the number of directory entries that reference the inode. For hard-linked files, multiple directory entries reference a single inode. The inode must not be removed until no directory entries are left (ie, the reference count is 0) to ensure that the filesystem remains consistent.
+
+5. Inode-based filesystems typically divide a file system partition into block groups. Each block group consists of a number of contiguous physical disk blocks. Inodes for a given block group are stored in the same physical location as the block groups. What are the advantages of this scheme? Are they any disadvantages?
+
+- Each group contains a redundant superblock. This make the file system more robust to disk block failures.
+- Block groups keep the inodes physically closer to the files they refer to than they would be (on average) on a system without block groups. Since accessing and updating files also involves accessing or updating its inode, having the inode and the file's block close together reduces disk seek time, and thus improves performance. The OS must take care that all blocks remain within the block group of their inode.
+
+6. Assume an inode with 10 direct blocks, as well as single, double and triple indirect block pointers. Taking into account creation and accounting of the indirect blocks themselves, what is the largest possible number of block reads and writes in order to:
+- Read 1 byte
+- Write 1 byte
+Assume the inode is cached in memory.
+
+To write 1 byte, in the worst case:
+
+- 4 writes: create single indirect block, create double indirect block, create triple indirect block, write data block.
+- 3 reads, 2 writes: read single indirect, read double indirect, read triple indirect, write triple indirect, write data block
+- Other combinations are possible
+
+To read 1 byte, in the worst case:
+
+- 4 reads: read single indirect, read double indirect, read triple indirect, read data block
+
+7. Assume you have an inode-based filesystem. The filesystem has 512 byte blocks. Each inode has 10 direct, 1 single indirect, 1 double indirect, and 1 triple indirect block pointer. Block pointers are 4 bytes each. Assume the inode and any block free list is always in memory. Blocks are not cached.
+
+8. How can deleting a file leave a inode-based file system (like ext2fs in Linux) inconsistent in the presence of a power failure.
+
+Deleting a file consists of three separate modifications to the disk:
+
+- Mark disk blocks as free.
+- Remove the directory entry.
+- Mark the i-node as free.
+
+If the system only completes a subset of the operations (due to power failures or the like), the file system is no longer consistent. See lecture slide for example of things that can go wrong.
+
+9. A typical UNIX inode stores both the file's size and the number of blocks currently used to store the file. Why store both? Should not blocks = size / block size?
+
+Blocks used to store the file are only indirectly related to file size.
+
+- The blocks used to store a file includes and indirect blocks used by the filesystem to keep track of the file data blocks themselves.
+- File systems only store blocks that actually contain file data. Sparsely populated files can have large regions that are unused within a file.
+
+10. How does adding journalling to a file system avoid corruption in the presence of unexpected power failures.
+
+Simply speaking, adding a journal addresses the issue by grouping file system updates into transactions that should either completely fail or succeed. These transactions are logged prior to manipulating the file system. In the presence of failure the transaction can be completed by replaying the updates remaining in the log.
+
+11. Adding journaling to a file system (where the journal is co-located on the same device as the file system) improves reliability at the expense of increasing the number of writes to the device.
+
+The answer us True
+
+Each write to a file results in a write to the journal and later a write to update the inode-based file system itself. Thus the number of writes required is potentially doubled.
+
+12. In a typical UNIX file system, such as ext2fs, the attributes of the file (e.g., file owner, size, and creation time) are stored in the directory entry.
+
+The answer is False.
+
+The attributes are stored in the inode of the file.
+
+13. A hypothetical i-node-based file system consists of i-nodes with only 12 direct addresses of blocks, and no addresses of indirect blocks. Each direct address is a 32-bit integer, and the block size is 2KiB. This file system only supports files with a maximum size of 24KiB.
+
+The answer is True.
+
+Only the number of direct blocks and the block size is relevant to determine the answer which is 12 * 2 KiB = 24 KiB
+
+14. A typical i-node-based UNIX file system features differing levels of indirection (levels of indirect blocks) depending on the offset of access to the file. File access performance would be improved for small files if the file system was simplified to use three levels of indirection for all offsets in the file.
+
+The answer is false.
+
+Small file presently use either directly accessed block or a single level of indirection.
+
+Using three levels of indirection for small files would reduce performance as the file system would have to traverse all three levels of indirection even for small files.
+
+15. When an application performs a series of small file system writes, having the operating system contiguously allocate multiple blocks on the initial write (and occasionally on subsequent writes) can improve file system performance compared to allocating a block at a time.
+
+True.
+
+Allocating multiple blocks next to each other improves future access to the file system as blocks on the disk are co-located and thus disk seeks are avoided.
+
+16. Sparse files save disk space by not storing the blocks of the file that are not written to.
+
+True.
+
+Only the blocks that are written two are actually stored on the disk. Unwritten blocks of a file are not saved and save space, and can be written on-demand if required in subsequent use.
+
+17. In a traditional UNIX file system (such as ext2fs), every file has an index block, called an inode, which is used to store information about the file as well as block numbers pointing directly to data blocks. Additionally, the inode contains pointers to single indirect, double indirect, and triple indirect blocks as shown in the diagram below.
+
+Given 512-byte blocks and 8-byte (64-bit) block numbers.
+What is the maximum amount of data a single file can contain in this file system?
+
+What is the range of file offsets that will result in data blocks being accessed via the double indirect block?
+
 
 ## Quiz 6 FileManagement & MemoryManagement
+1. Describe internal and external fragmentation?
+
+External Fragmentation: total memory space exists to satisfy a request, but it is not contiguous.
+
+Internal Fragmentation: allocated memory may be slightly larger than requested memory; this size difference is memory internal to a partition, but is not being used.
+
+2. What are the problems with multiprogrammed systems with fixed-partitioning?
+
+Internal fragmentation.
+
+Inability to run processes greater in size than a partition, but smaller then memory.
+
+3. Assume a system protected with base-limit registers. What are the advantages and problems with such a protected system (compared to either a unprotected system or a paged VM system)?
+
+- Disadvantages
+    - Partitions must be contiguous - external fragmentation.
+    - Entire process must be in memory.
+    - Cannot practically share memory with other processes.
+- Advantages
+    - Applications are protected from each other
+    - Memory for applications can be allocated dynamically and hardware translates the application (logical) addresses to allocated addresses.
+    - Multiple concurrent executions of the same application is possible.
+    - Compaction is also possible.
+
+4. A program is to run on a multiprogrammed machine. Describe at which points in time during program development to execution time where addresses within the program can be bound to the actual physical memory it uses for execution? What are the implication of using each of the three binding times?
+
+- Compile/Link time binding.
+    The executable itself contains the actual physical addresses it will use during execution. It can only run at one location, and only a single copy can run at a time, unless the executable is recompiled/relinked to a new location in physical memory prior to each execution.
+
+- Load time binding
+    Addresses within the executable are annotated such that when the program is loaded into physical memory, the loader can bind the addresses to the correct location within physical memory as the program is loaded (copied) into memory. This process slows loading (increases startup latency), and increases executable file size (to hold annotations, minor point).
+
+- Run-time binding
+    The compiler/linker generated addresses are bound to a logical address space (an abstract memory layout). The program executes using the logical addresses independent of where it is loaded into physical memory. At run-time the logical addresses are translated to the appropriate physical addresses by specialised hardware on each memory reference.
+
+Run-time binding is the most flexible (depending of the translation hardware available, e.g. page VM MMU), but it incurs the cost of translation on every memory reference, which can be significant.
+
+5. Describe four algorithms for allocating regions of contiguous memory, and comment on their properties.
+
+- First-Fit  
+Scan memory region list from start for first fit.
+
+Tends to skip over potentially many regions at the start of list.
+
+- Next-Fit  
+Scan memory region list from point of last allocation to next fit.
+
+Breaks up large block at end of memory with any reduction in searching.
+
+- Best-Fit  
+Pick the closest free region in the entire list.
+
+Tends to leave small unusable regions, and slower due to requirement of search the entire list.
+
+- Worst-Fit  
+Find the worst fit in the entire list
+
+Slower as it searches the entire list, fragmentation still an issue.
+
+6. What is memory compaction? Why would it be used?
+
+Moving all the allocated regions of memory next to each other (e.g. to the bottom of memory) to free up larger contiguous free regions.
+
+7. What is swapping? What benefit might it provide? What is the main limitation of swapping?
+
+Swapping is where a process is brought into main memory in its entirety, run for a while, and then put completely back on disk.
+
+Swapping allows the OS to run more programs than what would fit in memory if all programs remained resident in memory.
+
+Swapping is slow as it has to copy the entire program's in-memory image out to disk and back.
+
+8. What is Paging?
+
+In brief: Paging is where main memory is divided into equal-sized chunks (frames) and the programs address space (virtual address space) is also divided up into matching-sized chunks (pages). Memory is transfered to and from disk in units of pages.
+
+9. Why do all virtual memory system page sizes have to be a power of 2? Draw a picture.
+
+The lower bits of a virtual address is not translated and passed through the MMU to form a physical address.
+
+10. What is a TLB? What is its function?
+
+A translation lookaside buffer is an associative cache of page table entries used to speed up the translation of virtual addresses to physical addresses.
+
+11. Describe a two-level page table and how it is used to translate a virtual address into a physical address.
+
+See lecture slides in the virtual memory lecture.
+
+12. Given a two-level page table (in physical memory), what is the average number of physical memory accesses per virtual memory access in the case where the TLB has a 100% miss ratio, and the case of a 95% hit ratio?
+
+3
+
+1 * .95 + .05 * (1 + 2) = 1.1
+
+13. What are the two broad categories of events causing page faults? What other event might cause page faults?
+
+- Illegal memory references
+- Access to non-resident pages.
+
+14. Page faults may also be used to set reference and dirty bits on architectures that do not support them in hardware.
+
+Translate the following virtual addresses to Physical Addresses using the TLB. The system is a R3000. Indicate if the page is mapped, and if so if its read-only or read/write.
+
+The EntryHi register currently contains 0x00000200.
+
+The virtual addresses are 0x00028123, 0x0008a7eb, 0x0005cfff,0x0001c642, 0x0005b888, 0x00034000.
+
+15. Describe an inverted page table and how it is used to translate a virtual address into a physical address.
+
+See lecture slides in the virtual memory lecture.
+
+16. Describe a hashed page table and how it is used to translate a virtual address into a physical address.
+
+See lecture slides in the virtual memory lecture.
+
+17. Of the three page table types covered in lectures, which ones are most appropriate for large virtual address spaces that are sparsely populated (e.g. many single pages scattered through memory)?\
+
+The 2-level suffers from internal fragmentation of page table nodes themselves. The IPT and HPT is best as it is searched via a hash, and not based on the structure of the virtual address space.
+
+18. What is temporal and spatial locality?
+
+Temporal locality: states that recently accessed items are likely to be accessed in the near future.
+
+Spatial locality: says that items whose addresses are near one another tend to be referenced close together in time.
+
 
 ## Quiz 7 VM?
 
@@ -556,6 +792,8 @@ Spinning makes sense when the average spin time spent spinning is less than the 
 Spinning wastes CPU time and indirectly consumes bus bandwidth. When acquiring a lock, an overall system design should minimise time spent spinning, which implies minimising the time a lock holder holds the lock. Preemption of the lock holder extends lock holding time across potentially many time slices, increasing the spin time of lock acquirers.
 
 8. How does a read-before-test-and-set lock work and why does it improve scalability?
+
+https://edstem.org/au/courses/14865/discussion/1923067
 
 See the lecture notes for code. It improves scalability as the spinning is on a read instruction (not a test-and-set instruction), which allows the spinning to occur on a local-to-the-CPU cached copy of the lock's memory location. Only when the lock changes state is cache coherency traffic required across the bus as a result of invalidating the local copy of the lock's memory location, and the test-and-set instruction which require exclusive access to the memory across all CPUs.
 
