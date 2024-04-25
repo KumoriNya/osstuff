@@ -227,3 +227,383 @@ One could attempt to reduce the overall execution time by attempting to overlap 
 The answer is true.
 
 Non-preemptive multitasking relies on applications calling yield regularly to allow the scheduler to chose another thread to run. If a process/thread does not perform a system call and does not yield, a process can run forever without the OS (scheduler) ever regaining control.
+
+3. Application multi-threading provided by kernel-provided threads can have higher overheads (i.e. the time it takes to execute individual operations) than user-level threads as thread management (such as creation, and blocking/unblocking) requires a system call into the operating system.
+
+The answer is true and self explanatory.
+
+4. Applications can benefit from running on multi-processors when they are implemented to use multi-threading provided by kernel-level threads, but not user-level threads.
+
+The is true.
+
+Only the in-kernel scheduler is aware of the number of CPUs (processors) in the machine. It assigns ready threads to available CPUs to keep the machine busy.
+
+Thus kernel-provided threads can be spread across available CPUs to keep the machine busy.
+
+The kernel is unaware of any user-level threads, and thus can only schedule processes across available CPUs. It can't take advantage of any parallelism (ready user-level threads). 
+
+5. Application multi-threading supported by user-level threads features a per-thread user-level stack and a 1-to-1 corresponding per-thread in-kernel stack.
+
+The answer is false.
+
+Yes, each user-level thread would execute using a per-thread user-level stack. However, since the kernel is unaware of user-level threads (and their stacks), it only manages processes. Each process has its own in-kernel stack.
+
+So the relationship is many user-level stacks to 1 in-kernel stack.
+
+6. A context switch between user-level threads (also termed a thread switch), can be implemented by an assembly language function called from C that pushes a subset of the registers onto the current stack, saves the current stack pointer, and then sets the stack pointer to the target thread, and restores the target's registers.
+
+The answer is true.
+
+A thread switch can be implemented by preserving the C compiler calling convention and saving all saved registers (see the MIPS calling convention in lectures) on the current stack, then changing stacks, then restoring the registers such that we return to (continue) a different thread after the switch.  
+
+7. Application multi-threading implemented entirely at user-level (i.e. user-level threads) can be used to take advantage of multiple processors to increase performance, even in the situation of a single runnable process.
+
+The answer is false. 
+
+See Question 4 for an answer.
+
+8. Application multi-threading implemented entirely at user-level (i.e. user-level threads) does not expose the concurrency available in the application to the operating system.
+
+The answer is true.
+
+See Question 4 for an answer.
+
+9. Applications running as the root user under UNIX (or administrator under Windows XP/Vista/7/8/10) all run in the processor's privileged mode.
+
+The answer is false.
+
+All applications run in user-mode in the same way. 
+
+The operating system keeps track of the user associated with each process. The user may be root or administrator or some other user. The operating system allows those user-level applications to request certain operation based on the user. A root or administrator application is allowed to perform more operations than a normal user. It is not related to the privileged mode of the microprocessor.
+
+10. A system call processor instruction is one way to trigger the transition between the application running in user-mode to the Operating System running in privileged mode.
+
+- True
+
+11. A process and the operating system kernel share the same stack so they both can execute a high-level language like the C programming language.
+
+The answer is false.
+
+For each process, the operating system has 1 (or more in the case of kernel threads) stacks private to the operating system.
+
+The OS can't securely share a user-level stack as user-level can freely corrupt or compromise its own stack.
+
+12. The arguments to system calls are placed in registers (or on the application's stack) based on a mutually defined convention between the operating system and user-level applications.
+
+The answer is true.
+
+The OS defines the convention for how to request an operation when performing a system call. Applications adhere to the convention in order to correctly request OS services.
+
+13. What is a branch delay?
+
+The pipeline structure of the MIPS CPU means that when a jump instruction reaches the "execute" phase and a new program counter is generated, the instruction after the jump will already have been decoded. Rather than discard this potentially useful work, the architecture rules state that the instruction after a branch is always executed before the instruction at the target of the branch.
+
+14. The goal of this question is to have you reverse engineer some of the C compiler function calling convention (instead of reading it from a manual). The following code contains 6 functions that take 1 to 6 integer arguments. Each function sums its arguments and returns the sum as a the result. (Code)
+- Q1 arg1 (and functions in general) returns its return value in what register?
+    - A1 v0
+- Q2 Why is there no stack references in arg2?
+    - There are no local variables inside the function, so the compiler does not need space on the stack to store them.
+- Q3 What does jr ra do?
+    - It jumps (changes the program counter) to the address in the ra register. The ra register is set by a jal instruction to the address of the instruction after jal. Thus function calls can be implemented with jal and jr ra instructions.
+- Q4 Which register contains the first argument to the function?
+    - a0
+- Q5 Why is the move instruction in arg1 after the jr instruction.  
+    - The instruction after a jump (i.e. the instruction in the branch delay slot is executed prior to arriving at the destination of the jump. Thus, logically, the move instruction is executed before arg1 returns.
+- Q6 Why does arg5 and arg6 reference the stack?
+    - Up to 4 arguments can be passed to a function in registers. Arguments beyond the fourth are passed on the stack?
+
+15. The following code provides an example to illustrate stack management by the C compiler. Firstly, examine the C code in the provided example to understand how the recursive function works. (Code)
+
+16. Why is recursion or large arrays of local variables avoided by kernel programmers?
+
+- The kernel stack is usually a limited resource. A stack overflow crashes the entire machine.
+
+17. Compare cooperative versus preemptive multithreading?
+
+Cooperative multithreading is where the running thread must explicitly yield() the CPU so that the dispatcher can select a ready thread to run next. Preemptive multithreading is where an external event (e.g. a regular timer interrupt) causes the dispatcher to be invoked and thus preempt the running thread, and select a ready thread to run next.
+
+Cooperative multithreading relies on the cooperation of the threads to ensure each thread receives regular CPU time. Preemptive multithreading enforces a regular (at least systematic) allocation of CPU time to each thread, even when a thread is uncooperative or malicious.
+
+18. Describe user-level threads and kernel-level threads. What are the advantages or disadvantages of each approach?
+
+User-level threads are implemented in the application (usually in a "thread library"). The thread management structures (Thread Control Blocks) and scheduler are contained withing the application. The kernel has no knowledge of the user-level threads.
+
+Kernel threads are implemented in the kernel. The TCBs are managed by the kernel, the thread scheduler is the normal in-kernel scheduler.
+
+User threads are generally faster to create, destroy, manage, block and activate (no kernel entry and exit required).
+If a single user-level thread blocks in the kernel, the whole process is blocked. However, some libraries (e.g., most UNIX pthreads libraries) avoid blocking in the kernel by using non-blocking system call variants to emulate the blocking calls.
+User threads don't take advantage of parallelism available on multi-CPU machines.
+Kernel threads are usually preemptive, user-level threads are usually cooperative (Note: some user-level threads use alarms or timeouts to provide a tick for preemption).
+User-level threads can be implemented on OSes without support for kernel threads.
+
+19. A web server is constructed such that it is multithreaded. If the only way to read from a file is a normal blocking read system call, do you think user-level threads or kernel-level threads are being used for the web server? Why?
+
+
+A worker thread within the web server will block when it has to read a Web page from the disk. If user-level threads are being used, this action will block the entire process, destroying the value of multithreading. Thus it is essential that kernel threads are used to permit some threads to block without affecting the others.
+
+20. Assume a multi-process operating system with single-threaded applications. The OS manages the concurrent application requests by having a thread of control within the kernel for each process. Such a OS would have an in-kernel stack assocaited with each process.
+Switching between each process (in-kernel thread) is performed by the function switch_thread(cur_tcb,dst_tcb). What does this function do?
+
+The function saves the registers required to preserve the compiler calling convention (and registers to return to the caller) onto the current stack.
+
+The function saves the resulting stack pointer into the thread control block associated with cur_tcb, and sets the stack pointer to the stack pointer stored in destination tcb.
+
+The function then restores the registers that were stored previously on the destination (now current) stack, and returns to the destination thread to continue where is left off.
+
+21. What is the EPC register? What is it used for?
+
+This is a 32-bit register containing the 32-bit address of the return point for the last exception. The instruction causing (or suffering) the exception is at EPC, unless BD is set in Cause, in which case EPC points to the previous (branch) instruction.
+
+It is used by the exception handler to restart execution at the at the point where execution was interrupted.
+
+22. What happens to the KUc and IEc bits in the STATUS register when an exception occurs? Why? How are they restored?
+
+The 'c' (current) bits are shifted into the corresponding 'p' (previous) bits, after which KUc = 0, IEc = 0 (kernel mode with interrupts disabled). They are shifted in order to preserve the current state at the point of the exception in order to restore that exact state when returning from the exception.
+
+They are restored via a rfe instruction (restore from exception).
+
+23. What is the value of ExcCode in the Cause register immediately after a system call exception occurs?
+
+The value of ExcCode is 8.
+
+24. Why must kernel programmers be especially careful when implementing system calls?
+
+System calls with poor argument checking or implementation can result in a malicious or buggy program crashing, or compromising the operating system.
+
+25. The following questions are focused on the case study of the system call convention used by OS/161 on the MIPS R3000 from the lecture slides.
+- How does the 'C' function calling convention relate to the system call interface between the application and the kernel?
+- What does the most work to preserve the compiler calling convention, the system call wrapper, or the OS/161 kernel.
+- At minimum, what additional information is required beyond that passed to the system-call wrapper function?
+
+The 'C' function calling convention must always appear to be adhered to after any system-call wrapper function completes. This invovles saving and restoring of the preserved registers (e.g., s0-s8, ra). The system call convention also uses the calling convention of the C-compiler to pass arguments to OS/161. Having the same covention as the compiler means the system call wrapper can avoid moving arguments around and the compiler has already placed them where the OS expects to find them.
+
+The OS/161 kernel code does the saving and restoring of preserved registers. The system call wrapper function does very little.
+
+The interface between the system-call wrapper function and the kernel can be defined to provide additional information beyond that passed to the wrapper function. At minimum, the wrapper function must add the system call number to the arguments passed to the wrapper function. It's usually added by setting an agreed-to register to the value of the system call number.
+
+26. In the example given in lectures, the library function read invoked the read system call. Is it essential that both have the same name? If not, which name is important?
+
+System calls do not really have names, other than in a documentation sense. When the library function read() traps in to the kernel, it puts the number of the system call into a register or on the stack. This number is used to index into a jump table (e.g. a C switch statement). There is really no name used anywhere. On the other hand, the name of the library function is very important, since that is what appears in the program.
+
+Note: The kernel programmer may can the code in the operating system that implements read a similar name, e.g., sys_read. This is purely a convention for the sake of code clarity.
+
+27. To a programmer, a system call looks like any other call to a library function. Is it important that a programmer know which library function result in system calls? Under what circumstances and why?
+
+As far as program logic is concerned it does not matter whether a call to a library function results in a system call. But if performance is an issue, if a task can be accomplished without a system call the program will run faster. Every system call involves overhead in switching from the user context to the kernel context. Furthermore, on a multiuser system the operating system may schedule another process to run when a system call completes, further slowing the progress in real time of a calling process.
+
+28. Describe a plausible sequence of activities that occur when a timer interrupt results in a context switch.
+
+In the table below, almost everything that is not the timer device or CPU is actually just code executing within the kernel. The distinction of "who" is there to clarify which kernel subsystem is notionally responsible.
+
+## Quiz 4
+1. File systems based on contiguous allocation are suitable for read-only media such as optical disks (DVDs and CDs).
+
+The answer is true.
+
+Read-only media is created from a set of files of size known in advance, allowing efficient allocation planning.
+
+Contiguous allocation is an efficient layout minimising head seeking of the device.
+
+2. A FAT file system gets its name as it is designed for large disks.
+
+False
+
+It is actually the opposite. FAT = file allocation table. Typically it only supports smaller disks. 
+
+3. Using a bitmap to manage free blocks on a disk reduces the usable disk capacity compared to the approach of storing the addresses of free blocks in the free blocks themselves.
+
+True
+
+A bitmap approach reserves space on the disk to contain the bitmap independent of the current level of utilisation of the disk.
+
+The list-of-blocks of block numbers approach temporarily repurposes some of the free blocks to keep track of the free blocks. It dynamically sizes the number of block used based on the number of free blocks needing recording. When no blocks are free, no blocks need recording, and no free blocks are repurposed effective taking no space when the disk is full. 
+
+4. File systems based on indexed allocation (i.e. i-node-based file systems) have good random access performance compared to linked-list allocation.
+
+True
+
+Link-list based allocation requires the FS to read all blocks prior to the target block in order to locate the target block.
+
+Inode-based allocation can use the i-node structure to find the target directly. 
+
+5. A file system using linked-list disk allocation (also termed chained allocation) provides poor random access performance.
+
+True
+
+Link-list based allocation requires the FS to read all blocks prior to the target block in order to locate the target block.
+
+6. A file system uses contiguous allocation. The file system can save disk storage for sparse files by not storing the blocks of the file that are not written to.
+
+False
+
+Contiguous allocation records only the initial block on the disk and the file size. There is no metadata available to record any unused blocks.
+
+7. Consider a file currently consisting of 100 records of 400 bytes. The filesystem uses fixed blocking, i.e. one 400 byte record is stored per 512 byte block. Assume that the file control block (and the index block, in the case of indexed allocation) is already in memory. Calculate how many disk I/O operations are required for contiguous, linked, and indexed (single-level) allocation strategies, if, for one record, the following conditions hold. In the contiguous-allocation case, assume that there is no room to grow at the beginning, but there is room to grow at the end of the file. Assume that the record information to be added is stored in memory.
+
+8. In the previous example, only 400 bytes is stored in each 512 byte block. Is this wasted space due to internal or external fragmentation?
+
+Internal fragmentation
+
+9. Old versions of UNIX allowed you to write to directories. Newer ones do not even allow the superuser to write to them? Why? Note that many unices allow you read directories.
+
+To prevent total corruption of the fs. eg cat /dev/zero > /
+
+10. Given a file which varies in size from 4KiB to 4MiB, which of the three allocation schemes (contiguous, linked-list, or i-node based) would be suitable to store such a file? If the file is access randomly, how would that influence the suitability of the three schemes?
+
+Contiguous is not really suitable for a variable size file as it would require 4MiB to be pre-allocated, which would waste a lot of space if the file is generally mush smaller. Either linked-list of i-node-based allocation would be preferred. Adding random access to the situation (supported well by contiguous or i-node based), which further motivate i-node-based allocation to be the most appropriate.
+
+
+11. Why is there VFS Layer in Unix?
+
+- It provides a framework to support multiple file system types concurrently without requiring each file system to be aware of other file system types.
+- Provides transparent access to all supported file systems including network file systems (e.g. NFS, CODA)
+- It provides a clean interface between the file system independent kernel code and the file system specific kernel code.
+- Provide support for special file system types like /proc.
+
+12. How does choice of block size affect file system performance. You should consider both sequential and random access.
+
+- Sequential Access
+    - The larger the block size, the fewer I/O operations required and the more contiguous the disk accesses. Compare loading a single 16K block with loading 32 512-byte blocks.
+
+- Random Access
+    - The larger the block size, the more unrelated data loaded. Spatial locality of access can improve the situation.
+
+13. Is the open() system call in UNIX essential? What would be the consequence of not having it?
+
+It is not absolutely essential. The read and write system calls would have to be modified such that:
+The filename is passed in on each call to identify the file to operate on
+With a file descriptor to identify the open session that is returned by open, the sycalls would also need to specify the offset into the file that the syscall would need to use.
+Effectively opening and closing the file on each read or write would reduce performance.
+
+14. Some operating system provide a rename system call to give a file a new name. What would be different compared to the approach of simply copying the file to a new name and then deleting the original file?
+
+The rename system call would just change the string of characters stored in the directory entry. A copy operation would result in a new directory entry, and (more importantly) much more I/O as each block of the original file is copied into a newly allocated block in the new file. Additionally, the original file blocks need de-allocating after the copy finishes, and the original name removed from the directory. A rename is much less work, and thus way more efficient than the copy approach.
+
+15. In both UNIX and Windows, random file access is performed by having a special system call that moves the current position in the file so the subsequent read or write is performed from the new position. What would be the consequence of not having such a call. How could random access be supported by alternative means?
+
+Without being able to move the file pointer, random access is either extremely inefficient as one would have to read sequentially from the start each time until the appropriate offset is arrived at, or the an extra argument would need to be added to read or write to specify the offset for each operation.
+
+16. The following code accesses an existing file in a file system that is formatted with a disk block size of 1024 bytes. If offset is initialised to 7169, how many disk accesses are required to read the 1 byte for each of the following underlying file system types.
+
+Contiguous 1
+Linked 8
+FAT 1
+Inode 1
+
+## Quiz 5 FileManagement? (wk7)
+
+## Quiz 6 FileManagement & MemoryManagement
+
+## Quiz 7 VM?
+
+## Quiz 8 VM2, MultiProcessor Sys, Scheduling (Wk 10)
+### VM2
+1. What effect does increasing the page size have?
+
+- Increases internal fragmentation, and the unit of allocation is now greater, hence greater potential for un-used memory when allocation is rounded up. Practically speaking, this is not usually an issue, and round up an application to the next page boundary usually results in a relative small amount wasted compared to the application size itself.
+- Decreases number of pages. For a given amount of memory, larger pages result in fewer page table entries, thus smaller (and potentially faster to lookup) page table.
+- Increases TLB coverage as the TLB has a fixed number of entries, thus larger entries cover more memory, reducing miss rate.
+- Increases page fault latency as a page fault must load the whole page into memory before allowing the process to continue. Large pages have to wait for a longer loading time per fault.
+- Increases swapping I/O throughput. Given a certain amount of memory, larger pages have higher I/O throughput as the content of a page is stored contiguously on disk, giving sequential access.
+- Increases the working set size. Work set is defined as the size of memory associates with all pages accessed within a window of time. With large the pages, the more potential for pages to include significant amounts of unused data, thus working set size generally increases with page size.
+
+2. Why is demand paging generally more prevalent than pre-paging?
+
+Pre-paging requires predicting the future (which is hard) and the penalty for making a mistake may be expensive (may page out a needed page for an unneeded page).
+
+3. Describe four replacement policies and compare them.
+- Optimal, FIFO, LRU, Clock
+
+4. What is thrashing? How can it be detected? What can be done to combat it?
+
+Thrashing is where the sum of the working set sizes of all processes exceeds available physical memory and the computer spends more and more time waiting for pages to transfer in and out.
+
+It can be detected by monitoring page fault frequency.
+
+Some processes can be suspended and swapped out to relieve pressure on memory.
+### Multiprocessor Systems
+5. What are the advantages and disadvantages of using a global scheduling queue over per-CPU queues? Under which circumstances would you use the one or the other? What features of a system would influence this decision?
+
+Global queue is simple and provides automatic load balancing, but it can suffer from contention on the global scheduling queue in the presence of many scheduling events or many CPUs or both. Another disadvantage is that all CPUs are treated equally, so it does not take advantage of hot caches present on the CPU the process was last scheduled on.
+Per-CPU queues provide CPU affinity, avoid contention on the scheduling queue, however they require more complex schemes to implement load balancing.
+
+6. When does spinning on a lock (busy waiting, as opposed to blocking on the lock, and being woken up when it's free) make sense in a multiprocessor environment?
+
+Spinning makes sense when the average spin time spent spinning is less than the time spent blocking the lock requester, switching to another process, switching back, and unblocking the lock requester.
+
+7. Why is preemption an issue with spinlocks?
+
+Spinning wastes CPU time and indirectly consumes bus bandwidth. When acquiring a lock, an overall system design should minimise time spent spinning, which implies minimising the time a lock holder holds the lock. Preemption of the lock holder extends lock holding time across potentially many time slices, increasing the spin time of lock acquirers.
+
+8. How does a read-before-test-and-set lock work and why does it improve scalability?
+
+See the lecture notes for code. It improves scalability as the spinning is on a read instruction (not a test-and-set instruction), which allows the spinning to occur on a local-to-the-CPU cached copy of the lock's memory location. Only when the lock changes state is cache coherency traffic required across the bus as a result of invalidating the local copy of the lock's memory location, and the test-and-set instruction which require exclusive access to the memory across all CPUs.
+
+9. On a uniprocessor machine, it is more efficient to block and context switch than to spin (busy-wait) on a lock, even if the context switching overhead is very high.
+
+True.
+
+One a uniprocessor, the context switch to the lock holder is always required (for it to release the lock). Thus any spinning simply wastes CPU time and delays the inevitable context switch to the lock holder.
+
+10. A read before test and set implementation of a spinlock (also called a test and test and set) just adds extra overhead to the lock implementation by adding a superfluous read.
+
+False:
+
+The read allows the lock_acquire() to spin until the lock is available. Spinning, reading the lock variable results in the variable being cached, and no additional traffic on the memory bus. When the lock is available, the lock_acquire() then attempts to acquire the lock with a test_and_set instruction.
+
+Thus the read avoid repeating the test_and_set instruction in a tight loop when there is little chance to acquire the lock.
+
+11. On a multiprocessor machine, a single ready queue in the operating system provides automatic load balancing across CPUs.
+
+True.
+
+When a CPU chooses the next thread to run, it takes the head of the global queue shared between all CPUs. Thus all CPUs shared the load contained in the ready queue.
+
+12. Spinlocks can never be more efficient to use than blocking locks, even on a multiprocessor machine.
+
+False.
+
+Spinlocks can be more efficient when the time spent spinning is less than the cost of context switching.
+
+### Scheduling
+13. What do the terms I/O bound and CPU bound mean when used to describe a process (or thread)?
+
+The time to completion of a CPU-bound process is largely determined by the amount of CPU time it receives.
+
+The time to completion of a I/O-bound process is largely determined by the time taken to service its I/O requests. CPU time plays little part in the completion time of I/O-bound processes.
+
+14. What is the difference between cooperative and pre-emptive multitasking?
+
+In cooperative scheduling, threads explicitly release the CPU, while with pre-emptive the thread has no choice, a timer interrupt triggers the invocation of the scheduler and potentially a switch away from the currently running thread.
+
+15. Consider the multilevel feedback queue scheduling algorithm used in traditional Unix systems. It is designed to favour IO bound over CPU bound processes. How is this achieved? How does it make sure that low priority, CPU bound background jobs do not suffer starvation?
+
+Note: Unix uses low values to denote high priority and vice versa, 'high' and 'low' in the above text does not refer to the Unix priority value.
+
+I/O bound processes typically have many short CPU bursts. If such a process is scheduled, it will typically not use up it's time slice. Priorities are recomputed taking into account the consumed CPU, and hence an I/O-bound process will end up having a higher priority than a process that started at the same priority level and which used more CPU cycles.
+
+Even a process with low priority will be scheduled eventually, since the priority of processes that are continually scheduled eventually also receive a low or lower priority.
+
+Also note that the recorded amount of CPU consumed (that is used to calculate priority) is aged (reduced) over time, and hence CPU-bound processes also increase in priority is they are not scheduled.
+
+16. Why would a hypothetical OS always schedule a thread in the same address space over a thread in a different address space? Is this a good idea?
+
+Context switch is faster. Better locality. If done too often (e.g., always) it starves other tasks.
+
+17. Why would a round robin scheduler NOT use a very short time slice to provide good responsive application behaviour?
+
+CPU is consumed when switching from one task to another. This switching does not contribute to application progress. If done very frequently (a very short time slice), a significant portion of available CPU will be wasted on scheduler overhead.
+
+18. General purpose schedulers aim to improve interactivity and I/O performance by favouring I/O-bound processes (and threads) over CPU-bound processes (and threads). This improvement for I/O-bound processes comes with the disadvantage of dramatically reducing the CPU available to CPU-bound processes (and threads).
+
+False: I/O-bound processes spend a significant amount of their time waiting for I/O and using little CPU to make the I/O requests. Thus favouring I/O-bound processes still allows CPU-bound processes to be overlapped with I/O waiting 
+
+19. Round-robin scheduling gives each ready process (or thread) a turn to execute for a timeslice length of time. A short timeslice provides good interactive response times at the expense of more overhead due to more frequent context switching.
+
+True
+
+20. The traditional UNIX scheduler uses priorities to favour I/O-bound processes over CPU-bound processes. It fails to adjust when CPU-bound processes become I/O-bound and vice versa.
+
+False. 
+
+The UNIX scheduler adjusts the priority when a process is preempted by the scheduler. Thus is if an I/O bound process become CPU bound, the process will be preempted more often and thus have its priority adjusted. 
