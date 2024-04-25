@@ -513,6 +513,26 @@ Pre-paging requires predicting the future (which is hard) and the penalty for ma
 
 3. Describe four replacement policies and compare them.
 - Optimal, FIFO, LRU, Clock
+- Optimal
+    - Toss the page that won't be used for the longest time
+    - Impossible to implement
+    - Only good as a theoretic reference point: The closer a practical algorithm gets to optimal, the better
+- FIFO
+    - First-in, first-out: Toss the oldest page
+    - Easy to implement
+    - Age of a page is isn't necessarily related to usage
+- LRU
+    - Toss the least recently used page
+    - Assumes that page that has not been referenced for a long time is unlikely to be referenced in the near future
+    - Will work if locality holds
+    - Implementation requires a time stamp to be kept for each page, updated on every reference
+    - Impossible to implement efficiently
+- Clock
+    - Employs a usage or reference bit in the frame table.
+    - Set to one when page is used
+    - While scanning for a victim, reset all the reference bits
+    - Toss the first page with a zero reference bit.
+
 
 4. What is thrashing? How can it be detected? What can be done to combat it?
 
